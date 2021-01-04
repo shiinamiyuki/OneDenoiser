@@ -1,0 +1,9 @@
+{
+    "name": "one-denoiser",
+    "version-string": "0.1.0-dev",
+    "dependencies": [
+        "openimageio",
+        "spdlog",
+        "cxxopts"
+      ]
+  }

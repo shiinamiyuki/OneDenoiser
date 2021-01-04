@@ -1,0 +1,6 @@
+[submodule "vcpkg"]
+	path = vcpkg
+	url = https://github.com/microsoft/vcpkg
+[submodule "oidn"]
+	path = oidn
+	url = https://github.com/OpenImageDenoise/oidn
