@@ -57,7 +57,7 @@ Image read_img(const std::string &filename) {
     int channels = spec.nchannels;
     std::vector<float> pixels(xres * yres * channels);
     in->read_image(TypeDesc::FLOAT, &pixels[0]);
-    if (spec.format != TypeDesc::FLOAT || spec.format != TypeDesc::DOUBLE || spec.format != TypeDesc::HALF) {
+    if (spec.format != TypeDesc::FLOAT && spec.format != TypeDesc::DOUBLE && spec.format != TypeDesc::HALF) {
         std::transform(std::execution::par_unseq, pixels.begin(), pixels.end(), pixels.begin(),
                        [](float x) { return srgb_to_linear(x); });
     }
@@ -77,7 +77,7 @@ void write_img(const Image &img, const std::string &filename) {
     std::unique_ptr<ImageOutput> out = ImageOutput::create(filename);
     if (!out)
         return;
-    ImageSpec spec(xres, yres, channels, TypeDesc::UINT8);
+    ImageSpec spec(xres, yres, channels, TypeDesc::FLOAT);
     auto path = fs::path(filename);
     auto ext = path.extension();
     if (ext != ".exr") {
@@ -91,22 +91,28 @@ void write_img(const Image &img, const std::string &filename) {
 #ifdef ENABLE_OIDN
 Image run_oidn(const std::string &input_path, const std::string &albedo_path, const std::string &normal_path) {
     oidn::DeviceRef device = oidn::newDevice();
-    oidn::FilterRef filter = device.newFilter("rt");
+    device.commit();
+    oidn::FilterRef filter = device.newFilter("RT");
     auto input = read_img(input_path);
+    Image normal, albedo;
     filter.setImage("color", input.pixels.data(), oidn::Format::Float3, input.width, input.height);
     if (!albedo_path.empty()) {
-        auto albedo = read_img(albedo_path);
+        albedo = read_img(albedo_path);
         filter.setImage("albedo", albedo.pixels.data(), oidn::Format::Float3, input.width, input.height);
     }
     if (!normal_path.empty()) {
-        auto normal = read_img(normal_path);
+        normal = read_img(normal_path);
         filter.setImage("normal", normal.pixels.data(), oidn::Format::Float3, input.width, input.height);
     }
     Image output = input;
     filter.setImage("output", output.pixels.data(), oidn::Format::Float3, input.width, input.height);
     filter.set("hdr", true);
     filter.commit();
+    // std::cout << "denoising" << std::endl;
     filter.execute();
+    const char *errorMessage;
+    if (device.getError(errorMessage) != oidn::Error::None)
+        std::cout << "Error: " << errorMessage << std::endl;
     return output;
 }
 
@@ -166,5 +172,6 @@ int main(int argc, char **argv) {
         std::cerr << "unknown denosier " << algorithm << std::endl;
         exit(1);
     }
+    // std::cout << "writing output" << std::endl;
     write_img(output, output_path);
 }
